@@ -1,87 +1,98 @@
-# wayfl
+# AI Assistant TUI (Ollama + FTXUI)
 
-A minimal floating Wayland window, built with `xdg-shell`, intended as the base for a lightweight floating AI assistant widget on Hyprland (or any Wayland compositor).
+A terminal-based chat interface for talking to a local [Ollama](https://ollama.com) model, built in C++ with [FTXUI](https://github.com/ArthurSonzogni/ftxui).
+
+![status](https://img.shields.io/badge/status-early--prototype-yellow)
+
+## Features
+
+- Terminal UI chat window (input box, scrollable message history)
+- Talks to a local Ollama server via its REST API (`/api/chat`)
+- Color-coded messages (you vs. assistant)
 
 ## Requirements
 
-- A Wayland compositor (tested on Hyprland)
-- `wayland-client` dev libraries
-- `wayland-scanner` + the `xdg-shell` protocol XML (from `wayland-protocols`)
-- `gcc` and `make`
+- Linux
+- A C++17 compiler (`g++` or `clang++`)
+- [Ollama](https://ollama.com) installed and running locally
+- Libraries:
+  - [FTXUI](https://github.com/ArthurSonzogni/ftxui)
+  - `libcurl`
+  - [nlohmann/json](https://github.com/nlohmann/json)
 
-### Install dependencies
+## Setup
 
-**Arch / Hyprland-based distros:**
+### 1. Install Ollama and pull a model
+
 ```bash
-sudo pacman -S wayland wayland-protocols base-devel
+# make sure the Ollama server is running
+ollama serve
+
+# in another terminal, pull the model referenced in main.cpp
+ollama pull minimax-m3:cloud
 ```
 
-**Debian / Ubuntu:**
+> If you'd rather use a different model, change the `"model"` field in `callOllama()` inside `main.cpp`, and make sure you've pulled it with `ollama pull <model-name>`.
+
+### 2. Install dependencies
+
 ```bash
-sudo apt install libwayland-dev wayland-protocols build-essential
+sudo apt install libcurl4-openssl-dev nlohmann-json3-dev
 ```
 
-**Fedora:**
+### 3. Install FTXUI
+
 ```bash
-sudo dnf install wayland-devel wayland-protocols-devel gcc make
+git clone https://github.com/ArthurSonzogni/ftxui.git
+cd ftxui && mkdir build && cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make -j$(nproc)
+sudo make install
 ```
 
 ## Build
 
-```bash
-make
-```
+From the project folder (where `main.cpp` lives):
 
-This generates the required `xdg-shell` protocol bindings automatically and builds the binary to `bin/wayfl`.
+```bash
+g++ main.cpp -o assistant \
+    -lftxui-component -lftxui-dom -lftxui-screen \
+    -lcurl -std=c++17
+```
 
 ## Run
 
-```bash
-make run
-```
-or directly:
-```bash
-./bin/wayfl
-```
-
-## Make it float on Hyprland
-
-By default, Hyprland tiles new windows. Add a window rule so this app always opens floating, centered, at a fixed size.
-
-Add to your Hyprland config (commonly `~/.config/hypr/config/rules.conf` or `hyprland.conf`):
-
-```
-windowrule {
-    name = "ai_assistant"
-    match:class = ^(wayfl)$
-    float = on
-    center = on
-    size = 320 240
-    no_shadow = on
-}
-```
-
-Then reload Hyprland:
-```bash
-hyprctl reload
-```
-
-> Note: if your Hyprland version uses the older `windowrulev2` syntax instead of block syntax, use:
-> ```
-> windowrulev2 = float, class:^(wayfl)$
-> windowrulev2 = size 320 240, class:^(wayfl)$
-> ```
-
-If the rule doesn't match, run `hyprctl clients` while the app is open to confirm the exact `class` Hyprland reports, and adjust the rule accordingly.
-
-## Clean
+Make sure the Ollama server is running (`ollama serve`, or it's already running in the background), then:
 
 ```bash
-make clean
+./assistant
 ```
 
-Removes the binary and generated protocol files.
+Type a message and press **Enter** to send it. The assistant's reply will appear below your message.
 
-## Status
+## Known Limitations
 
-Early scaffold — currently renders a solid-color placeholder window. Intended next steps: draggable dragging support, custom rendering (text/UI), and the actual assistant logic.
+This is an early prototype. A few things are intentionally simplified for now:
+
+- **Blocking calls** — the UI freezes while waiting for a response from Ollama, since the request runs synchronously on the main thread.
+- **No streaming** — replies are shown all at once, rather than token-by-token as they're generated.
+- **No conversation memory** — each message is sent to Ollama on its own; previous turns aren't included, so the model has no context of earlier messages.
+
+## Planned Improvements
+
+- [ ] Move Ollama requests to a background thread so the UI stays responsive
+- [ ] Enable streaming responses for a live "typing" effect
+- [ ] Maintain full conversation history and send it with each request
+- [ ] Configurable model name (via CLI flag or config file)
+
+## Project Structure
+
+```
+.
+├── main.cpp     # application source
+└── README.md    # this file
+```
+
+## License
+
+MIT (or update as you see fit)
